@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/bedrock-tool/bedrocktool/bedrock-skin-bot/utils"
+	"github.com/bedrockteam/skin-bot/utils"
 	"github.com/disgoorg/dislog"
 	"github.com/disgoorg/snowflake"
 	"golang.org/x/exp/maps"

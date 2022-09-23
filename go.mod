@@ -1,4 +1,4 @@
-module github.com/bedrock-tool/bedrocktool/bedrock-skin-bot
+module github.com/bedrockteam/skin-bot
 
 go 1.19
 

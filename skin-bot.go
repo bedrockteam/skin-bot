@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/bedrock-tool/bedrocktool/bedrock-skin-bot/utils"
+	"github.com/bedrockteam/skin-bot/utils"
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
