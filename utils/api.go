@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -63,6 +64,10 @@ func (u *apiClient) Start() error {
 	resp, err := APIClient.doRequest(req)
 	if err != nil {
 		return nil
+	}
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("API StatusCode: %d", resp.StatusCode)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
