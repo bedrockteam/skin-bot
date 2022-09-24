@@ -1,25 +1,7 @@
 token.json
-.secrets
 config.toml
 node_id.txt
-
-*.mcpack
-*.zip
-*.pcap
-*.bmp
-*.bin
-*.log
-
-/bedrocktool
-/bedrocktool-*
-/bedrock-skin-bot
+/skin-bot
 __debug_bin
 
-.vscode/*
-keys.db
-/skins/
-/worlds/
-/dist/
-/public/
-/builds/
 /tokens/

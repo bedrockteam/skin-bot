@@ -16,14 +16,6 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const SERVER_ADDRESS_HELP = `accepted server address formats:
-  123.234.123.234
-  123.234.123.234:19132
-  realm:<Realmname>
-  realm:<Realmname>:<Id>
-
-`
-
 var (
 	G_debug         bool
 	G_cleanup_funcs []func() = []func(){}
