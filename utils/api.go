@@ -57,11 +57,10 @@ func (u *apiClient) Start(want_pubsub bool) error {
 		PrometheusPushURL string
 		PrometheusAuth    string
 	}
-
 	req, _ := http.NewRequest("GET", APIClient.server+"/routes", nil)
 	resp, err := APIClient.doRequest(req)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	if resp.StatusCode != 200 {
