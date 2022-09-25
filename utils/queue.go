@@ -186,7 +186,7 @@ func (q *MQ) PubSubSkin(ctx context.Context, username, xuid string, skin *DBSkin
 		return err
 	}
 
-	err := q.channel.PublishWithContext(ctx, "new_skins", "", false, false, amqp.Publishing{
+	err = q.channel.PublishWithContext(ctx, "new_skins", "", false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        data,
 	})
