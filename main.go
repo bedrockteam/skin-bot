@@ -52,8 +52,6 @@ var bots = make(map[string]*Bot)
 // ip -> time to retry
 var ip_waitlist = make(map[string]time.Time)
 
-var G_metrics *Metrics
-
 func main() {
 	defer func() {
 		if err := recover(); err != nil {
@@ -133,8 +131,7 @@ func main() {
 	}
 
 	{ // setup api client
-		G_metrics = NewMetrics()
-		if err := utils.InitAPIClient(config.API.Server, config.API.Key, G_metrics); err != nil {
+		if err := utils.InitAPIClient(config.API.Server, config.API.Key, NewMetrics(), utils.NewQueue(false)); err != nil {
 			logrus.Fatal(err)
 		}
 		if err := utils.APIClient.Start(); err != nil {

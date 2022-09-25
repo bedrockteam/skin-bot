@@ -71,8 +71,10 @@ func (b *Bot) Start(ctx context.Context) {
 		bots_lock.Unlock()
 	}()
 
-	G_metrics.RunningBots.WithLabelValues(b.ServerName).Inc()
-	defer G_metrics.RunningBots.WithLabelValues(b.ServerName).Dec()
+	metrics := utils.APIClient.Metrics.(*Metrics)
+
+	metrics.RunningBots.WithLabelValues(b.ServerName).Inc()
+	defer metrics.RunningBots.WithLabelValues(b.ServerName).Dec()
 
 	for {
 		tstart := time.Now()
@@ -86,14 +88,14 @@ func (b *Bot) Start(ctx context.Context) {
 
 		shortRun := time.Since(tstart) < 10*time.Second
 		if !b.spawned || shortRun {
-			G_metrics.Deaths.WithLabelValues(b.ServerName, b.Address).Inc()
+			metrics.Deaths.WithLabelValues(b.ServerName, b.Address).Inc()
 			b.log().Warn("Failed to fast, adding ip to waitlist for 15 minutes")
 			ip_waitlist[b.Address] = time.Now().Add(15 * time.Minute)
 		}
 
 		if err != nil {
 			b.log().Warn(err)
-			G_metrics.DisconnectEvents.WithLabelValues(b.ServerName, b.Address).Inc()
+			metrics.DisconnectEvents.WithLabelValues(b.ServerName, b.Address).Inc()
 		}
 
 		time.Sleep(30 * time.Second)
@@ -173,5 +175,5 @@ func (b *Bot) maybeSubmitPlayer(player cachedPlayer, skin *utils.Skin) {
 		return
 	}
 
-	go utils.APIClient.UploadSkin(skin, username, player.xuid, b.ServerName)
+	go utils.APIClient.UploadSkin(context.Background(), skin, username, player.xuid, b.ServerName)
 }

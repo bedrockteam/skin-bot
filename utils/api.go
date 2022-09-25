@@ -1,14 +1,11 @@
 package utils
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -21,27 +18,29 @@ type Metrics interface {
 	Delete()
 }
 
+type Queue interface {
+	Start(url string) error
+}
+
 type apiClient struct {
 	server string
 	key    string
 
 	client *http.Client
 
-	queue   apiQueue
+	Queue   *MQ
 	Metrics Metrics
 }
 
 var APIClient *apiClient
 
 // InitAPIClient creates the api client
-func InitAPIClient(APIServer, APIKey string, metrics Metrics) error {
+func InitAPIClient(APIServer, APIKey string, metrics Metrics, queue *MQ) error {
 	APIClient = &apiClient{
-		server: APIServer,
-		key:    APIKey,
-		client: &http.Client{},
-		queue: apiQueue{
-			connect_lock: &sync.Mutex{},
-		},
+		server:  APIServer,
+		key:     APIKey,
+		client:  &http.Client{},
+		Queue:   queue,
 		Metrics: metrics,
 	}
 	return nil
@@ -75,8 +74,11 @@ func (u *apiClient) Start() error {
 	}
 
 	// rabbitmq
-	u.queue.uri = response.AMQPUrl
-	u.queue.Reconnect()
+	if u.Queue != nil {
+		if err := u.Queue.Start(response.AMQPUrl); err != nil {
+			return err
+		}
+	}
 
 	// prometheus
 	if u.Metrics != nil {
@@ -92,24 +94,17 @@ func (u *apiClient) Start() error {
 var c = 0
 
 // UploadSkin pushes a skin to the message server
-func (u *apiClient) UploadSkin(skin *Skin, username, xuid string, serverAddress string) {
+func (u *apiClient) UploadSkin(ctx context.Context, skin *Skin, username, xuid string, serverAddress string) {
 	c += 1
 	logrus.Infof("Uploading Skin %s %s %d", serverAddress, username, c)
 
-	body, _ := json.Marshal(QueuedSkin{
+	err := u.Queue.PublishSkin(ctx, &QueuedSkin{
 		username,
 		xuid,
 		skin.Json(),
 		serverAddress,
 		time.Now().Unix(),
 	})
-
-	buf := bytes.NewBuffer(nil)
-	w := gzip.NewWriter(buf)
-	w.Write(body)
-	w.Close()
-
-	err := u.queue.Publish(context.Background(), buf.Bytes(), "application/json-gz")
 	if err != nil {
 		logrus.Warn(err)
 	}
