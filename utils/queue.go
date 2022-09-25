@@ -172,7 +172,7 @@ func (q *MQ) ReceiveSkins() chan *QueuedSkin {
 }
 
 // PubSubSkin puts skin to the pubsub
-func (q *MQ) PubSubSkin(ctx context.Context, username, xuid, skin *DBSkinListItem) error {
+func (q *MQ) PubSubSkin(ctx context.Context, username, xuid string, skin *DBSkinListItem) error {
 	if !q.isConnected {
 		<-q.reopen
 	}
