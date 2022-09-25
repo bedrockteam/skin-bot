@@ -22,7 +22,9 @@ type Metrics struct {
 }
 
 func (m *Metrics) Delete() {
-	m.Pusher.Delete()
+	if m.Pusher != nil {
+		m.Pusher.Delete()
+	}
 }
 
 func (m *Metrics) Start(url, user, password string) error {

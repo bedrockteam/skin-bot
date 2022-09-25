@@ -175,5 +175,5 @@ func (b *Bot) maybeSubmitPlayer(player cachedPlayer, skin *utils.Skin) {
 		return
 	}
 
-	go utils.APIClient.UploadSkin(context.Background(), skin, username, player.xuid, b.ServerName)
+	utils.APIClient.UploadSkin(context.Background(), skin, username, player.xuid, b.ServerName)
 }

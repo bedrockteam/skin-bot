@@ -16,10 +16,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-var (
-	G_debug         bool
-	G_cleanup_funcs []func() = []func(){}
-)
+var G_debug bool
 
 var name_regexp = regexp.MustCompile(`\||(?:§.?)`)
 

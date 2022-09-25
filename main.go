@@ -38,13 +38,6 @@ type Config struct {
 	ServerBlacklist []string
 }
 
-func cleanup() {
-	logrus.Info("\nCleaning up\n")
-	for i := len(utils.G_cleanup_funcs) - 1; i >= 0; i-- { // go through cleanup functions reversed
-		utils.G_cleanup_funcs[i]()
-	}
-}
-
 // ip -> bot
 var bots_lock = &sync.Mutex{}
 var bots = make(map[string]*Bot)
@@ -53,23 +46,6 @@ var bots = make(map[string]*Bot)
 var ip_waitlist = make(map[string]time.Time)
 
 func main() {
-	defer func() {
-		if err := recover(); err != nil {
-			logrus.Errorf("Fatal Error occurred.")
-			println("")
-			println("--COPY FROM HERE--")
-			logrus.Infof("Cmdline: %s", os.Args)
-			logrus.Errorf("Error: %s", err)
-			println("--END COPY HERE--")
-			println("")
-			println("if you want to report this error, please open an issue at")
-			println("https://github.com/bedrock-tool/bedrocktool/issues")
-			println("And attach the error info, describe what you did to get this error.")
-			println("Thanks!\n")
-			os.Exit(1)
-		}
-	}()
-
 	logrus.SetLevel(logrus.DebugLevel)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -83,7 +59,6 @@ func main() {
 		<-sigs
 		println("cancel")
 		cancel()
-		cleanup()
 	}()
 
 	var config Config
@@ -131,15 +106,14 @@ func main() {
 	}
 
 	{ // setup api client
-		if err := utils.InitAPIClient(config.API.Server, config.API.Key, NewMetrics(), utils.NewQueue(false)); err != nil {
+		if err := utils.InitAPIClient(config.API.Server, config.API.Key, NewMetrics()); err != nil {
 			logrus.Fatal(err)
 		}
-		if err := utils.APIClient.Start(); err != nil {
+		if err := utils.APIClient.Start(false); err != nil {
 			logrus.Fatal(err)
 		}
-		// remove after exit
-		defer utils.APIClient.Metrics.Delete()
 	}
+	defer utils.APIClient.Close()
 
 	// starting the bots
 	for {
@@ -202,11 +176,9 @@ func main() {
 		case <-time.After(5 * time.Second):
 		case <-ctx.Done():
 		}
+
 		if ctx.Err() != nil {
 			break
 		}
 	}
-
-	cleanup()
-	os.Exit(0)
 }

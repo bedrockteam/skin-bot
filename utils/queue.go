@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"sync"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -15,84 +14,111 @@ import (
 )
 
 type MQ struct {
-	conn       *amqp.Connection
-	channel    *amqp.Channel
-	skin_queue amqp.Queue
-	pub_queue  amqp.Queue
-	err        chan *amqp.Error
+	conn               *amqp.Connection
+	channel            *amqp.Channel
+	skin_queue         amqp.Queue
+	isConnected        bool
+	done               chan bool
+	inital_connect_err chan error
+	reopen             chan bool
+	notifyClose        chan *amqp.Error
 
 	uri         string
 	want_pubsub bool
 
-	connect_lock *sync.Mutex
+	had_success bool
 }
 
-func NewQueue(want_pubsub bool) *MQ {
-	return &MQ{
-		connect_lock: &sync.Mutex{},
-		want_pubsub:  want_pubsub,
+func NewQueue(uri string, want_pubsub bool) *MQ {
+	q := &MQ{
+		done:               make(chan bool),
+		reopen:             make(chan bool),
+		inital_connect_err: make(chan error),
+		want_pubsub:        want_pubsub,
+		uri:                uri,
 	}
+	go q.handleReconnect()
+	return q
 }
 
-func (q *MQ) Start(url string) error {
-	q.uri = url
-	q.Reconnect()
-	return nil
+var reconnectDelay = 5 * time.Second
+
+func (q *MQ) handleReconnect() {
+	for {
+		q.isConnected = false
+		logrus.Info("Attempting to connect to amqp")
+		for {
+			if err := q.connect(); err != nil {
+				logrus.Errorf("AMQP: %s", err)
+				if !q.had_success {
+					q.inital_connect_err <- err
+				}
+				logrus.Info("Failed to connect. Retrying...")
+				time.Sleep(reconnectDelay)
+				continue
+			}
+			break
+		}
+
+		logrus.Info("Connected to RabbitMQ")
+
+		if !q.had_success {
+			q.had_success = true
+			q.inital_connect_err <- nil
+		}
+
+		// wait for it to close and retry
+		// or end and exit
+		select {
+		case <-q.done:
+			return
+		case <-q.notifyClose:
+		}
+	}
 }
 
 // Reconnect connect to the message broker
-func (q *MQ) Reconnect() {
-	q.connect_lock.Lock()
-	defer q.connect_lock.Unlock()
-	if q.conn != nil {
-		return
+func (q *MQ) connect() error {
+	if q.conn != nil && !q.conn.IsClosed() {
+		return nil
 	}
 
-	var err error
-	for {
-		if err != nil {
-			logrus.Errorf("Error Connecting to RabbitMQ %s", err)
-			logrus.Info("Trying to reconnect to RabbitMQ at %s", q.uri)
-			time.Sleep(10 * time.Second)
-		}
-
-		q.conn, err = amqp.Dial(q.uri)
-		if err != nil {
-			continue
-		}
-		q.err = make(chan *amqp.Error)
-		q.conn.NotifyClose(q.err)
-
-		q.channel, err = q.conn.Channel()
-		if err != nil {
-			continue
-		}
-		q.skin_queue, err = q.channel.QueueDeclare("player_skins", false, false, false, true, nil)
-		if err != nil {
-			continue
-		}
-
-		if q.want_pubsub {
-			err = q.channel.ExchangeDeclare("new_skins", "fanout", false, false, false, true, nil)
-			if err != nil {
-				continue
-			}
-		}
-
-		break
+	conn, err := amqp.Dial(q.uri)
+	if err != nil {
+		return err
 	}
+	ch, err := conn.Channel()
+	if err != nil {
+		return err
+	}
+	ch.Confirm(false)
+
+	return q.changeConnection(conn, ch)
 }
 
-// AquireConn makes sure there is a connection
-func (q *MQ) AquireConn() {
-	select { // non blocking channel - if there is no error will go to default where we do nothing
-	case err := <-q.err:
-		if err != nil {
-			q.conn = nil
-			q.Reconnect()
-		}
-	default:
+func (q *MQ) changeConnection(connection *amqp.Connection, channel *amqp.Channel) error {
+	q.conn = connection
+	q.channel = channel
+
+	var err error
+	q.skin_queue, err = q.channel.QueueDeclare("player_skins", false, false, false, true, nil)
+	if err != nil {
+		return err
 	}
+
+	if q.want_pubsub {
+		err = q.channel.ExchangeDeclare("new_skins", "fanout", false, false, false, true, nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	q.notifyClose = make(chan *amqp.Error)
+	q.conn.NotifyClose(q.notifyClose)
+	q.isConnected = true
+	close(q.reopen)
+	q.reopen = make(chan bool)
+	return nil
 }
 
 // process_message decodes a message to skin
@@ -118,39 +144,44 @@ func process_message(d *amqp.Delivery) (*QueuedSkin, error) {
 }
 
 // ReceiveSkins receives skins to a channel
-func (q *MQ) ReceiveSkins() (chan *QueuedSkin, error) {
-	q.AquireConn()
-
-	msgs, err := q.channel.Consume("player_skins", "", true, false, false, false, nil)
-	if err != nil {
-		return nil, err
-	}
-
+func (q *MQ) ReceiveSkins() chan *QueuedSkin {
 	ch := make(chan *QueuedSkin)
 
 	go func() {
-		for d := range msgs {
-			skin, err := process_message(&d)
+		for {
+			if !q.isConnected {
+				<-q.reopen
+			}
+			msgs, err := q.channel.Consume("player_skins", "", true, false, false, false, nil)
 			if err != nil {
-				logrus.Errorf("Error processing message %s", err)
+				logrus.Warn(err)
 				continue
 			}
-			ch <- skin
+
+			for d := range msgs {
+				skin, err := process_message(&d)
+				if err != nil {
+					logrus.Errorf("Error processing message %s", err)
+					continue
+				}
+				ch <- skin
+			}
 		}
 	}()
-
-	return ch, err
+	return ch
 }
 
 // PubSubSkin puts skin to the pubsub
 func (q *MQ) PubSubSkin(ctx context.Context) error {
-	q.AquireConn()
-
-	err := q.channel.PublishWithContext(ctx, q.pub_queue.Name, "", false, false, amqp.Publishing{
+	if !q.isConnected {
+		<-q.reopen
+	}
+	err := q.channel.PublishWithContext(ctx, "new_skins", "", false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        []byte("a"),
 	})
 	if err != nil {
+		q.conn = nil
 		return fmt.Errorf("error PubSub: %s", err)
 	}
 
@@ -160,20 +191,37 @@ func (q *MQ) PubSubSkin(ctx context.Context) error {
 
 // PublishSkin publishes a skin to the skin queue
 func (q *MQ) PublishSkin(ctx context.Context, skin *QueuedSkin) error {
-	q.AquireConn()
-
 	body, _ := json.Marshal(skin)
 	buf := bytes.NewBuffer(nil)
 	w := gzip.NewWriter(buf)
 	w.Write(body)
 	w.Close()
 
-	err := q.channel.PublishWithContext(ctx, "", q.skin_queue.Name, false, false, amqp.Publishing{
-		ContentType: "application/json-gz",
-		Body:        buf.Bytes(),
-	})
-	if err != nil {
-		return fmt.Errorf("error Publishing: %s", err)
+	for {
+		// wait for the connection
+		if !q.isConnected {
+			<-q.reopen
+		}
+
+		err := q.channel.PublishWithContext(ctx, "", q.skin_queue.Name, false, false, amqp.Publishing{
+			ContentType: "application/json-gz",
+			Body:        buf.Bytes(),
+		})
+		if err != nil {
+			logrus.Warnf("Publishing: %s", err)
+			continue
+		}
+		break
 	}
 	return nil
+}
+
+func (q *MQ) Close() {
+	q.done <- true
+	if q.channel != nil {
+		q.channel.Close()
+	}
+	if q.conn != nil {
+		q.conn.Close()
+	}
 }
