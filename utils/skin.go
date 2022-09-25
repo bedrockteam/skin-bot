@@ -6,11 +6,19 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
+type QueuedSkin struct {
+	Username      string
+	Xuid          string
+	Skin          *JsonSkinData
+	ServerAddress string
+	Time          int64
+}
+
 type Skin struct {
 	protocol.Skin
 }
 
-type skin_anim struct {
+type Skin_anim struct {
 	ImageWidth, ImageHeight uint32
 	ImageData               string
 	AnimationType           uint32
@@ -18,13 +26,13 @@ type skin_anim struct {
 	ExpressionType          uint32
 }
 
-type jsonSkinData struct {
+type JsonSkinData struct {
 	SkinID                          string
 	PlayFabID                       string
 	SkinResourcePatch               string
 	SkinImageWidth, SkinImageHeight uint32
 	SkinData                        string
-	Animations                      []skin_anim
+	Animations                      []Skin_anim
 	CapeImageWidth, CapeImageHeight uint32
 	CapeData                        string
 	SkinGeometry                    string
@@ -43,10 +51,10 @@ type jsonSkinData struct {
 	Trusted                         bool
 }
 
-func (s *Skin) Json() *jsonSkinData {
-	var skin_animations []skin_anim
+func (s *Skin) Json() *JsonSkinData {
+	var skin_animations []Skin_anim
 	for _, sa := range s.Animations {
-		skin_animations = append(skin_animations, skin_anim{
+		skin_animations = append(skin_animations, Skin_anim{
 			ImageWidth:     sa.ImageWidth,
 			ImageHeight:    sa.ImageHeight,
 			ImageData:      base64.RawStdEncoding.EncodeToString(sa.ImageData),
@@ -55,7 +63,7 @@ func (s *Skin) Json() *jsonSkinData {
 			ExpressionType: sa.ExpressionType,
 		})
 	}
-	return &jsonSkinData{
+	return &JsonSkinData{
 		SkinID:                    s.SkinID,
 		PlayFabID:                 s.PlayFabID,
 		SkinResourcePatch:         base64.RawStdEncoding.EncodeToString(s.SkinResourcePatch),
@@ -83,7 +91,7 @@ func (s *Skin) Json() *jsonSkinData {
 	}
 }
 
-func (j *jsonSkinData) ToSkin() *Skin {
+func (j *JsonSkinData) ToSkin() *Skin {
 	skin_resourcepatch, _ := base64.RawStdEncoding.DecodeString(j.SkinResourcePatch)
 	skin_data, _ := base64.RawStdEncoding.DecodeString(j.SkinResourcePatch)
 	cape_data, _ := base64.RawStdEncoding.DecodeString(j.CapeData)

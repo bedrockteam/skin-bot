@@ -96,13 +96,13 @@ func (u *apiClient) UploadSkin(skin *Skin, username, xuid string, serverAddress 
 	c += 1
 	logrus.Infof("Uploading Skin %s %s %d", serverAddress, username, c)
 
-	body, _ := json.Marshal(struct {
-		Username      string
-		Xuid          string
-		Skin          *jsonSkinData
-		ServerAddress string
-		Time          int64
-	}{username, xuid, skin.Json(), serverAddress, time.Now().Unix()})
+	body, _ := json.Marshal(QueuedSkin{
+		username,
+		xuid,
+		skin.Json(),
+		serverAddress,
+		time.Now().Unix(),
+	})
 
 	buf := bytes.NewBuffer(nil)
 	w := gzip.NewWriter(buf)
