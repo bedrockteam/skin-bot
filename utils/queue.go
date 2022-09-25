@@ -172,13 +172,23 @@ func (q *MQ) ReceiveSkins() chan *QueuedSkin {
 }
 
 // PubSubSkin puts skin to the pubsub
-func (q *MQ) PubSubSkin(ctx context.Context) error {
+func (q *MQ) PubSubSkin(ctx context.Context, username, xuid, skin *DBSkinListItem) error {
 	if !q.isConnected {
 		<-q.reopen
 	}
+
+	data, err := json.Marshal(struct {
+		Username string          `json:"username"`
+		Xuid     string          `json:"xuid"`
+		Skin     *DBSkinListItem `json:"skin"`
+	}{username, xuid, skin})
+	if err != nil {
+		return err
+	}
+
 	err := q.channel.PublishWithContext(ctx, "new_skins", "", false, false, amqp.Publishing{
 		ContentType: "application/json",
-		Body:        []byte("a"),
+		Body:        data,
 	})
 	if err != nil {
 		q.conn = nil
