@@ -22,6 +22,12 @@ type Queue interface {
 	Start(url string) error
 }
 
+type APIRoutes struct {
+	AMQPUrl           string
+	PrometheusPushURL string
+	PrometheusAuth    string
+}
+
 type apiClient struct {
 	server string
 	key    string
@@ -30,6 +36,7 @@ type apiClient struct {
 
 	Queue   *MQ
 	Metrics Metrics
+	Routes  *APIRoutes
 }
 
 var APIClient *apiClient
@@ -41,6 +48,7 @@ func InitAPIClient(APIServer, APIKey string, metrics Metrics) error {
 		key:     APIKey,
 		client:  &http.Client{},
 		Metrics: metrics,
+		Routes:  nil,
 	}
 	return nil
 }
@@ -52,36 +60,36 @@ func (u *apiClient) doRequest(req *http.Request) (resp *http.Response, err error
 
 // Start starts the api client
 func (u *apiClient) Start(want_pubsub bool) error {
-	var response struct {
-		AMQPUrl           string
-		PrometheusPushURL string
-		PrometheusAuth    string
-	}
-	req, _ := http.NewRequest("GET", APIClient.server+"/routes", nil)
-	resp, err := APIClient.doRequest(req)
-	if err != nil {
-		return err
-	}
+	if u.Routes == nil {
+		req, _ := http.NewRequest("GET", APIClient.server+"/routes", nil)
+		resp, err := APIClient.doRequest(req)
+		if err != nil {
+			return err
+		}
 
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("API StatusCode: %d", resp.StatusCode)
-	}
+		if resp.StatusCode != 200 {
+			return fmt.Errorf("API StatusCode: %d", resp.StatusCode)
+		}
 
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return err
+		u.Routes = &APIRoutes{}
+		if err := json.NewDecoder(resp.Body).Decode(u.Routes); err != nil {
+			return err
+		}
 	}
 
 	// rabbitmq
-	u.Queue = NewQueue(response.AMQPUrl, want_pubsub)
-	err = <-u.Queue.inital_connect_err
-	if err != nil {
-		logrus.Fatal(err)
+	if u.Routes.AMQPUrl != "" {
+		u.Queue = NewQueue(u.Routes.AMQPUrl, want_pubsub)
+		err := <-u.Queue.inital_connect_err
+		if err != nil {
+			logrus.Fatal(err)
+		}
 	}
 
 	// prometheus
-	if u.Metrics != nil && false {
-		auth := strings.Split(response.PrometheusAuth, ":")
-		if err := u.Metrics.Start(response.PrometheusPushURL, auth[0], auth[1]); err != nil {
+	if u.Metrics != nil && u.Routes.PrometheusPushURL != "" {
+		auth := strings.Split(u.Routes.PrometheusAuth, ":")
+		if err := u.Metrics.Start(u.Routes.PrometheusPushURL, auth[0], auth[1]); err != nil {
 			return err
 		}
 	}
