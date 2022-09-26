@@ -92,9 +92,9 @@ func (s *Skin) Json() *JsonSkinData {
 }
 
 func (j *JsonSkinData) ToSkin() *Skin {
-	skin_resourcepatch, _ := base64.RawStdEncoding.DecodeString(j.SkinResourcePatch)
-	skin_data, _ := base64.RawStdEncoding.DecodeString(j.SkinResourcePatch)
+	skin_data, _ := base64.RawStdEncoding.DecodeString(j.SkinData)
 	cape_data, _ := base64.RawStdEncoding.DecodeString(j.CapeData)
+	skin_resourcepatch, _ := base64.RawStdEncoding.DecodeString(j.SkinResourcePatch)
 	skin_geometry, _ := base64.RawStdEncoding.DecodeString(j.SkinGeometry)
 
 	skin_animations := make([]protocol.SkinAnimation, len(j.Animations))
