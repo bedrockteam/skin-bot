@@ -8,10 +8,8 @@ replace github.com/sandertv/gophertunnel => github.com/olebeck/gophertunnel v1.2
 
 require (
 	github.com/BurntSushi/toml v1.2.0
-	github.com/disgoorg/disgo v0.7.5-0.20220326145558-0c7982618192
 	github.com/disgoorg/dislog v1.0.6
 	github.com/disgoorg/snowflake v1.1.0
-	github.com/disgoorg/snowflake/v2 v2.0.0
 	github.com/fatih/color v1.13.0
 	github.com/google/uuid v1.3.0
 	github.com/prometheus/client_golang v1.13.0
@@ -26,6 +24,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/df-mc/atomic v1.10.0 // indirect
+	github.com/disgoorg/disgo v0.7.5-0.20220326145558-0c7982618192 // indirect
 	github.com/disgoorg/log v1.2.0 // indirect
 	github.com/go-gl/mathgl v1.0.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
@@ -41,7 +40,6 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/sandertv/go-raknet v1.12.0 // indirect
 	github.com/sasha-s/go-csync v0.0.0-20210812194225-61421b77c44b // indirect
-	go.mongodb.org/mongo-driver v1.10.2 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d // indirect
 	golang.org/x/image v0.0.0-20190802002840-cff245a6509b // indirect
@@ -51,4 +49,5 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
